@@ -37,6 +37,22 @@ def _show_banner() -> None:
     )
 
 
+def _backend_url() -> str:
+    """Read the backend URL from the environment or Streamlit Cloud secrets."""
+    environment_url = os.getenv("BACKEND_URL")
+    if environment_url is not None:
+        if environment_url.strip():
+            return environment_url.strip()
+        raise ValueError("BACKEND_URL must not be blank.")
+    try:
+        secret_url = st.secrets["BACKEND_URL"]
+    except (FileNotFoundError, KeyError):
+        return "http://127.0.0.1:8000"
+    if not isinstance(secret_url, str) or not secret_url.strip():
+        raise ValueError("BACKEND_URL must be a non-empty string.")
+    return secret_url.strip()
+
+
 def _render_chat(client: BackendClient) -> None:
     st.subheader("Chat")
     st.caption(
@@ -279,7 +295,7 @@ def main() -> None:
     st.set_page_config(page_title="fin-agent-eval", layout="wide")
     _show_banner()
     st.title("Finance education agent evaluation demo")
-    backend_url = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
+    backend_url = _backend_url()
     client = BackendClient(backend_url)
     if not st.session_state.get("backend_ready", False):
         with st.status(
