@@ -4,7 +4,7 @@ A local-first evaluation harness for a finance-education chatbot using fictional
 
 ## Status
 
-Phase 1 (scaffold) is in progress. Later phases will add the fictional domain pack, chatbot, evaluation harness, UI, and deployment workflows. No model names have been configured yet.
+Phase 1 (scaffold) is complete: local lint, tests, coverage, pre-commit, and GitHub Actions pass. Later phases will add the fictional domain pack, chatbot, evaluation harness, UI, and deployment workflows. No model names have been configured yet.
 
 ## Requirements
 
