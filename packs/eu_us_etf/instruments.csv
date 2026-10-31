@@ -1,0 +1,5 @@
+symbol,name,type,currency,expense_ratio_pct,domicile,distribution
+DEMO-WORLD-ETF,Fictional Global Basket ETF,etf,EUR,0.20,Fictional,accumulating
+DEMO-US-LARGE,Fictional US Large Company Basket ETF,etf,USD,0.15,Fictional,distributing
+DEMO-EU-BOND,Fictional Euro Bond Basket ETF,etf,EUR,0.25,Fictional,distributing
+DEMO-ALL-MARKET,Fictional Broad Market Basket ETF,etf,EUR,0.18,Fictional,accumulating

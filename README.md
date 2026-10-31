@@ -4,7 +4,7 @@ A local-first evaluation harness for a finance-education chatbot using fictional
 
 ## Status
 
-Phase 1 (scaffold) is complete: local lint, tests, coverage, pre-commit, and GitHub Actions pass. Later phases will add the fictional domain pack, chatbot, evaluation harness, UI, and deployment workflows. No model names have been configured yet.
+Phases 1 and 2 are complete: the local scaffold, fictional `eu_us_etf` domain pack, and deterministic tool registry have passing tests. Later phases will add the chatbot, evaluation harness, UI, and deployment workflows. No model names have been configured yet.
 
 ## Requirements
 
@@ -35,6 +35,12 @@ Run the API locally after setup:
 ```
 
 Then open `http://127.0.0.1:8000/health` or `http://127.0.0.1:8000/version`.
+
+## Fictional pack and tools
+
+The `packs/eu_us_etf/` files contain invented DemoBroker fees, instruments, and dated currency rates. They are for software tests only and are not current real-world data. Its 18 knowledge documents are unverified drafts; educational descriptions marked `TODO(verify)` need owner review before being treated as verified.
+
+The tool registry in `app/tools/registry.py` exposes fee, hypothetical-growth, currency-conversion, instrument-lookup, position-size, knowledge-search, and simulated-escalation tools. Each request is validated with Pydantic. Invalid arguments return an explicit error. The Phase 2 knowledge search uses deterministic keyword overlap; Phase 3 will provide the hybrid retriever.
 
 ## Configuration
 
