@@ -4,7 +4,7 @@ A local-first evaluation harness for a finance-education chatbot using fictional
 
 ## Status
 
-Phases 1-7 are implemented. Phase 3 adds the record/replay/live Gemini client, hybrid BM25/embedding retrieval, guarded LangGraph agent, and `POST /chat`. Phase 4 adds reviewable golden cases, metrics, judge auditing, resumable evaluation runs, a quality gate, and report comparison. Phase 5 adds a Streamlit UI backed only by the HTTP API. Phase 6 packages the API and UI for local Docker use. Phase 7 adds GitHub Actions checks and Dependabot. API keys are not committed; live Gemini requests may use quota.
+Phases 1-7 are implemented. Phase 3 adds the record/replay/live Gemini client, hybrid BM25/embedding retrieval, guarded LangGraph agent, and `POST /chat`. Phase 4 adds reviewable golden cases, metrics, judge auditing, resumable evaluation runs, a quality gate, and report comparison. Phase 5 adds a Streamlit UI backed only by the HTTP API. Phase 6 packages the API and UI for local Docker use. Phase 7 adds GitHub Actions checks and Dependabot. Phase 8's free-tier deployment preview is live, but Gemini is not configured. API keys are not committed; live Gemini requests may use quota.
 
 ## Requirements
 
@@ -160,48 +160,55 @@ Terraform files are added in Phase 8. Dependabot checks Python dependencies,
 GitHub Actions, and Docker weekly; Terraform updates can be enabled when its
 configuration is added.
 
-## Free-tier deployment preview (not deployed)
+## Free-tier deployment (live)
 
-The optional deployment preview uses a Render Blueprint in `render.yaml`
-instead of Terraform. The current Render Terraform provider only documents
-paid compute plans ([provider resource docs](https://registry.terraform.io/providers/render-oss/render/latest/docs/resources/web_service));
-Render Blueprints support the `free` plan ([Blueprint specification](https://render.com/docs/blueprint-spec)).
-This preview does not create cloud resources, publish a container image,
-configure secrets, or add a GitHub Actions deployment workflow. A created
-Blueprint may sync repository changes automatically; leave **Auto Sync**
-disabled until you explicitly want redeployments. Do not click **Deploy
-Blueprint** until you have reviewed the proposed service and decided to publish it.
+The prototype is deployed as a public Render API and a public Streamlit
+Community Cloud UI:
 
-The free Render API would be public, sleep after 15 minutes without traffic,
-and use an ephemeral filesystem. The documented free compute plan has 0.1 CPU
-and 512 MB RAM. Render currently includes 750 free instance hours per workspace
-each calendar month, so one continuously running service can use nearly all of
-that allowance; included bandwidth/build-pipeline limits also apply. Excess
-usage can incur charges if a payment method is attached. Free instances are
-for hobby/testing use, not production. Review Render's
-[free instance limits](https://render.com/docs/free) before deployment.
-No Gemini key is included: the local fictional fee calculator and deterministic
-policy refusals work, but ordinary model chat is not configured. Do not add a
-Gemini key unless you choose to enable model calls and accept its quota and
-potential billing implications.
+- UI: <https://fin-agent-eval-chat.streamlit.app/>
+- API health: <https://fin-agent-eval-api.onrender.com/health>
+- API source configuration: [`render.yaml`](./render.yaml)
 
-If you later approve deployment:
+The API uses Render's **Free** plan. Free instances can sleep after 15 minutes
+without traffic, have limited compute (currently 0.1 CPU and 512 MB RAM), and
+use an ephemeral filesystem. Workspace usage, bandwidth, and build limits
+apply; check Render's current [free instance limits](https://render.com/docs/free)
+and your workspace's billing page. Free instances are for hobby/testing, not
+production. The API is public and has no authentication. Do not send personal,
+account, or other sensitive information. Its rate and daily request limits are
+in-memory safeguards, not an access-control mechanism or a guaranteed billing
+cap. Keep Render Blueprint **Auto Sync** disabled; sync changes manually after
+review.
 
-1. Review `render.yaml` and create the Render Blueprint from the repository;
-   verify the service is on the **Free** plan before confirming. The API URL
-   will be shown in the Render dashboard.
-2. Deploy `ui/app.py` from this public GitHub repository to
-   [Streamlit Community Cloud](https://docs.streamlit.io/deploy/streamlit-community-cloud).
-   Select Python 3.12 in the app settings.
-3. In the Streamlit app's **Advanced settings → Secrets**, set
-   `BACKEND_URL = "https://<your-render-service>.onrender.com"`. This is a
-   public endpoint, not a credential. The UI reads it from `st.secrets`.
-4. Verify `/health`, the `/fees` endpoint, and the UI before sharing the URL.
-   Expect a cold start after idle periods. Keep Render Auto Sync disabled
-   until you explicitly want repository changes to redeploy the service.
+The Streamlit app and local fictional fee calculator work without a Gemini key.
+Ordinary AI chat is not configured until one is added. To enable it later,
+without putting a key in GitHub or changing the code:
 
-This is a manual, review-first alternative to the roadmap's Terraform/CD plan;
-no apply, public deployment, or automatic release workflow is configured.
+1. First review the Gemini project's quota and billing settings. The public,
+   unauthenticated API could be called by other people and consume your key's
+   quota. Add authentication or otherwise protect the API before enabling a
+   key for a shared public demo.
+2. In Render, open the `fin-agent-eval-api` service, go to **Environment**, and
+   add `GEMINI_API_KEY` as a secret environment variable. Never commit the key
+   to this repository, put it in the Streamlit app's secrets, or share it in
+   chat.
+3. Save the environment change and let Render restart/redeploy the service.
+   The deployed API already uses `LLM_MODE=live`; a key with valid model access
+   and available quota enables Gemini calls. Chat requests and retrieval may
+   use Gemini quota. The UI's fee calculator remains local to the API and does
+   not call Gemini.
+4. Test with non-sensitive questions, check service logs and quota, and remove
+   the key from Render if you no longer want live calls.
+
+The evaluation judge is separate from user-facing chat. The current judge is
+Gemini-backed; a local judge is not currently implemented. A small local model
+could be explored for offline evaluation on a development machine, but it is
+not a drop-in provider and is not recommended on Render's 512 MB free instance.
+Any replacement judge should be validated against human-reviewed labels before
+its scores are used.
+
+This is a manual, review-first deployment; no Terraform apply or automatic
+release workflow is configured.
 
 To protect `main`, open **Settings → Branches → Add branch protection rule**,
 set the branch name pattern to `main`, and require pull requests plus these
