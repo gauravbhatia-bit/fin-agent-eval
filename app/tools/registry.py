@@ -5,6 +5,7 @@ from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
 
+from app.retrieval.base import Retriever
 from app.tools import escalate, fees, fx, growth, instruments, risk, search
 
 InputModel = TypeVar("InputModel", bound=BaseModel)
@@ -83,7 +84,11 @@ class ToolError(BaseModel):
     error: str
 
 
-def dispatch_tool(name: str, arguments: dict[str, object]) -> dict[str, object]:
+def dispatch_tool(
+    name: str,
+    arguments: dict[str, object],
+    retriever: Retriever | None = None,
+) -> dict[str, object]:
     """Validate and invoke a registered tool; report invalid requests explicitly."""
     spec = TOOLS.get(name)
     if spec is None:
@@ -96,6 +101,11 @@ def dispatch_tool(name: str, arguments: dict[str, object]) -> dict[str, object]:
             for item in error.errors()
         )
         return ToolError(error=details).model_dump()
+    if name == "search_knowledge" and retriever is not None:
+        search_input = search.SearchInput.model_validate(validated.model_dump())
+        return search.SearchOutput(
+            results=retriever.search(search_input.query, search_input.top_k)
+        ).model_dump(mode="json")
     return spec.function(validated).model_dump(mode="json")
 
 

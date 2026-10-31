@@ -16,6 +16,14 @@ class Hit(BaseModel):
     score: float = Field(ge=0, le=1)
 
 
+class KnowledgeDocument(BaseModel):
+    """Validated knowledge document loaded from one domain pack."""
+
+    doc_id: str
+    title: str
+    body: str
+
+
 class Retriever(Protocol):
     """Interface implemented by pack-backed knowledge retrievers."""
 

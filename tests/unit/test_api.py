@@ -24,7 +24,7 @@ def test_version_returns_build_and_model_configuration() -> None:
     payload = response.json()
     assert payload["git_sha"] == "dev"
     assert payload["app_version"] == "0.1.0"
-    assert payload["prompt_version"] is None
+    assert payload["prompt_version"] == "v1"
     assert payload["gemini_model"] is None
     assert payload["gemini_judge_model"] is None
     assert payload["gemini_embed_model"] is None
