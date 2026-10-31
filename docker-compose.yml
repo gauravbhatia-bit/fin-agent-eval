@@ -1,0 +1,60 @@
+services:
+  api:
+    image: fin-agent-eval:local
+    build:
+      context: .
+      args:
+        GIT_SHA: ${GIT_SHA:-dev}
+    environment:
+      APP_ENV: local
+      PORT: "8000"
+      GIT_SHA: ${GIT_SHA:-dev}
+      LLM_MODE: ${LLM_MODE:-live}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
+      GEMINI_JUDGE_MODEL: ${GEMINI_JUDGE_MODEL:-}
+      GEMINI_EMBED_MODEL: ${GEMINI_EMBED_MODEL:-}
+    ports:
+      - "${API_HOST_PORT:-8000}:8000"
+    volumes:
+      - ./reports:/app/reports:ro
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  ui:
+    image: fin-agent-eval:local
+    command:
+      - streamlit
+      - run
+      - ui/app.py
+      - --server.address=0.0.0.0
+      - --server.port=8501
+      - --server.headless=true
+    environment:
+      BACKEND_URL: http://api:8000
+      PYTHONPATH: /app
+    ports:
+      - "${UI_HOST_PORT:-8501}:8501"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=2)"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - ./ui:/app/ui:ro
+    depends_on:
+      api:
+        condition: service_healthy

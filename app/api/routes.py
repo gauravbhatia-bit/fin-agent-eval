@@ -68,10 +68,34 @@ def chat(
             detail="Chat is not configured for this request.",
         ) from error
     except Exception as error:
-        logger.error("Chat processing failed (%s)", type(error).__name__)
+        provider_code = getattr(error, "code", None)
+        if not isinstance(provider_code, int):
+            provider_code = None
+        provider_status = getattr(error, "status", None)
+        if not isinstance(provider_status, str):
+            provider_status = None
+        logger.error(
+            "Chat processing failed (%s; provider_code=%s; provider_status=%s)",
+            type(error).__name__,
+            provider_code,
+            provider_status,
+        )
+        detail = "The chat request could not be completed. Please try again."
+        if provider_code is not None and provider_status:
+            if provider_code == 429 or provider_status == "RESOURCE_EXHAUSTED":
+                detail = (
+                    "Gemini quota or rate limit reached. AI chat is temporarily "
+                    "unavailable; the local fictional Fee calculator remains "
+                    "available and does not use Gemini."
+                )
+            else:
+                detail = (
+                    f"Gemini returned HTTP {provider_code} ({provider_status}). "
+                    "Check the model ID, API key access, quota, and request settings."
+                )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="The chat request could not be completed. Please try again.",
+            detail=detail,
         ) from error
 
     response = ChatResponse(

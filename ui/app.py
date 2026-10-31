@@ -18,10 +18,6 @@ from ui.data import (
 REPOSITORY_URL = "https://github.com/gauravbhatia-bit/fin-agent-eval"
 EXAMPLE_QUESTIONS = (
     ("Explain an ETF", "What is an ETF?"),
-    (
-        "Calculate a demo fee",
-        "Using fictional DemoBroker data, calculate the fee for a 2000 EUR ETF buy.",
-    ),
     ("Should I buy?", "Should I buy DEMO-WORLD-ETF?"),
     ("Will it double?", "Will this fund double next year?"),
 )
@@ -44,8 +40,10 @@ def _show_banner() -> None:
 def _render_chat(client: BackendClient) -> None:
     st.subheader("Chat")
     st.caption(
-        "Chat history is held in this browser session and is not stored by the UI."
+        "Chat history is held in this browser session and is not stored by the UI. "
+        "Use the local fee calculator below for calculations that do not require AI."
     )
+    _render_fee_calculator(client)
     if "chat_session_id" not in st.session_state:
         st.session_state.chat_session_id = uuid4().hex
     if "chat_turns" not in st.session_state:
@@ -70,7 +68,8 @@ def _render_chat(client: BackendClient) -> None:
     with st.chat_message("user"):
         st.markdown(question)
     try:
-        response = client.chat(st.session_state.chat_session_id, question)
+        with st.spinner("Waiting for the chat service..."):
+            response = client.chat(st.session_state.chat_session_id, question)
     except BackendError as error:
         with st.chat_message("assistant"):
             st.error(str(error))
@@ -78,6 +77,52 @@ def _render_chat(client: BackendClient) -> None:
     st.session_state.chat_turns.append({"question": question, "response": response})
     with st.chat_message("assistant"):
         _render_answer(response)
+
+
+def _render_fee_calculator(client: BackendClient) -> None:
+    st.subheader("Fictional DemoBroker fee calculator")
+    st.caption(
+        "Uses the local DemoBroker schedule; no Gemini request, API key, or billing "
+        "is needed. These are invented figures, not real broker pricing."
+    )
+    with st.form("fee-calculator"):
+        instrument_type = st.selectbox(
+            "Investment type",
+            options=("etf", "stock", "savings_plan"),
+            format_func=lambda value: {
+                "etf": "ETF",
+                "stock": "Stock",
+                "savings_plan": "Savings plan",
+            }[value],
+        )
+        side = st.selectbox("Order side", options=("buy", "sell"))
+        order_value = st.number_input(
+            "Order value (EUR)",
+            min_value=0.01,
+            max_value=1_000_000.00,
+            value=2_000.00,
+            step=100.00,
+        )
+        submitted = st.form_submit_button("Calculate fictional fee")
+
+    if not submitted:
+        return
+    try:
+        result = client.calculate_fee(instrument_type, side, order_value)
+    except BackendError as error:
+        st.error(f"Could not calculate the fee: {error}")
+        return
+
+    st.metric("Estimated fictional fee", f"EUR {result['fee']:.2f}")
+    st.write(f"Fee as a percentage of order value: {result['fee_pct']:.4f}%")
+    st.markdown("**Breakdown**")
+    for component in result["breakdown"]:
+        label = str(component["label"]).replace("_", " ").capitalize()
+        st.write(f"{label}: EUR {component['amount']:.2f}")
+    st.warning(
+        "This uses made-up DemoBroker data. It excludes taxes, spreads, currency "
+        "costs, and other charges; it is not real pricing or financial advice."
+    )
 
 
 def _render_answer(response: dict[str, object]) -> None:

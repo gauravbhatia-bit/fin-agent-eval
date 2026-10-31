@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_call:
 
 permissions:
   contents: read
@@ -21,8 +22,127 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+          cache-dependency-path: requirements.txt
       - run: pip install -r requirements.txt
       - run: pip install --no-deps --no-build-isolation -e .
-      - run: ruff check .
-      - run: ruff format --check .
+      - run: pre-commit run --all-files
       - run: pytest -q --cov=app --cov=evals --cov-fail-under=75
+
+  eval-smoke:
+    needs: lint-test
+    runs-on: ubuntu-latest
+    env:
+      LLM_MODE: replay
+      APP_ENV: ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - run: pip install -r requirements.txt
+      - run: pip install --no-deps --no-build-isolation -e .
+      - name: Check for recorded replay cassettes
+        id: cassettes
+        run: |
+          if find evals/cassettes -type f -name '*.json' -print -quit 2>/dev/null | grep -q .; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Run replay evaluation smoke suite
+        if: steps.cassettes.outputs.available == 'true'
+        run: >-
+          python -m evals.runner --pack eu_us_etf --subset smoke --runs 1
+          --mode replay --allow-draft --out reports/latest.json
+      - name: Run deterministic smoke checks while replay data is unavailable
+        if: steps.cassettes.outputs.available != 'true'
+        run: |
+          echo "::warning::No replay cassettes are checked in. Running offline API/tool smoke tests instead; this does not evaluate model answer quality."
+          pytest -q tests/unit/test_chat_api.py tests/unit/test_tools.py
+      - name: Check smoke evaluation baseline
+        if: steps.cassettes.outputs.available == 'true'
+        id: smoke-baseline
+        run: |
+          if test -f evals/baseline.smoke.json; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Enforce smoke evaluation baseline
+        if: steps.cassettes.outputs.available == 'true' && steps.smoke-baseline.outputs.available == 'true'
+        run: python -m evals.gate reports/latest.json --baseline evals/baseline.smoke.json
+      - name: Note missing smoke baseline
+        if: steps.cassettes.outputs.available == 'true' && steps.smoke-baseline.outputs.available != 'true'
+        run: echo "::warning::No reviewed evals/baseline.smoke.json exists yet, so the replay report is uploaded without a quality-gate comparison."
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-smoke-report
+          path: reports/
+          if-no-files-found: ignore
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: fin-agent-eval:ci
+          build-args: GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Run container and check health and local fee calculation
+        run: |
+          docker run -d --name fin-agent-eval-api -p 8000:10000 \
+            -e LLM_MODE=replay \
+            -e GIT_SHA="${GITHUB_SHA}" fin-agent-eval:ci
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health > /tmp/health.json; then
+              break
+            fi
+            sleep 2
+          done
+          grep -F "${GITHUB_SHA}" /tmp/health.json
+          curl -fsS -X POST http://localhost:8000/fees \
+            -H "Content-Type: application/json" \
+            -d '{"instrument_type":"etf","side":"buy","order_value":2000}' \
+            | grep -F '"fee":3.0'
+      - name: Show container logs on failure
+        if: failure()
+        run: docker logs fin-agent-eval-api
+
+  terraform-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for Terraform configuration
+        id: terraform
+        run: |
+          if find infra/terraform -type f -name '*.tf' -print -quit 2>/dev/null | grep -q .; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Note deferred Terraform validation
+        if: steps.terraform.outputs.configured != 'true'
+        run: echo "::warning::No Terraform files exist yet. Validation will run after the infrastructure is added in Phase 8."
+      - uses: hashicorp/setup-terraform@v3
+        if: steps.terraform.outputs.configured == 'true'
+      - name: Check Terraform formatting
+        if: steps.terraform.outputs.configured == 'true'
+        working-directory: infra/terraform
+        run: terraform fmt -check -recursive
+      - name: Initialize Terraform
+        if: steps.terraform.outputs.configured == 'true'
+        working-directory: infra/terraform
+        run: terraform init -backend=false
+      - name: Validate Terraform
+        if: steps.terraform.outputs.configured == 'true'
+        working-directory: infra/terraform
+        run: terraform validate

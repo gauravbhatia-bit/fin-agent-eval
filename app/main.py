@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api.fees import router as fees_router
 from app.api.routes import router as chat_router
 from app.api.runtime import ChatRuntime, IpRateLimiter, SessionMemory
 from app.config import Settings, get_settings
@@ -48,6 +49,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         rate_limiter=IpRateLimiter(),
     )
     application.include_router(chat_router)
+    application.include_router(fees_router)
 
     @application.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:

@@ -24,10 +24,12 @@ class BackendClient:
         *,
         session: requests.Session | None = None,
         timeout_seconds: float = 10,
+        chat_timeout_seconds: float = 180,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.session = session or requests.Session()
         self.timeout_seconds = timeout_seconds
+        self.chat_timeout_seconds = chat_timeout_seconds
 
     def health(self) -> dict[str, Any]:
         """Return the backend health payload."""
@@ -39,11 +41,46 @@ class BackendClient:
             response = self.session.post(
                 f"{self.base_url}/chat",
                 json={"session_id": session_id, "message": message},
+                timeout=(self.timeout_seconds, self.chat_timeout_seconds),
+            )
+        except requests.ConnectTimeout as error:
+            raise BackendError(
+                "The chat service connection timed out.", retryable=True
+            ) from error
+        except requests.ConnectionError as error:
+            raise BackendError(
+                "The chat service could not be reached.", retryable=True
+            ) from error
+        except requests.ReadTimeout as error:
+            raise BackendError(
+                "The chat request timed out while waiting for the backend. "
+                "It may still be processing; check the API logs before retrying."
+            ) from error
+        except requests.RequestException as error:
+            raise BackendError("The chat request failed before a response.") from error
+        return self._decode(response)
+
+    def calculate_fee(
+        self,
+        instrument_type: str,
+        side: str,
+        order_value: float,
+    ) -> dict[str, Any]:
+        """Calculate a fictional fee using the local deterministic API."""
+        try:
+            response = self.session.post(
+                f"{self.base_url}/fees",
+                json={
+                    "instrument_type": instrument_type,
+                    "side": side,
+                    "order_value": order_value,
+                },
                 timeout=self.timeout_seconds,
             )
         except requests.RequestException as error:
             raise BackendError(
-                "The chat service could not be reached.", retryable=True
+                "The local fee calculator service could not be reached.",
+                retryable=True,
             ) from error
         return self._decode(response)
 

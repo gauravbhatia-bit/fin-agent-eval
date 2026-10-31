@@ -56,6 +56,88 @@ def test_chat_rate_limits_requests_per_client_ip() -> None:
     assert "wait a minute" in limited.json()["detail"]
 
 
+def test_chat_surfaces_provider_status_without_provider_error_body(
+    monkeypatch,
+) -> None:
+    import app.api.routes as routes
+
+    class ProviderError(Exception):
+        code = 400
+        status = "INVALID_ARGUMENT"
+
+    def fail_graph(_state: object) -> None:
+        raise ProviderError("provider response details stay private")
+
+    monkeypatch.setattr(routes.agent_graph, "invoke", fail_graph)
+    client = build_client()
+
+    response = client.post(
+        "/chat",
+        json={"session_id": "test-session", "message": "What is an ETF?"},
+    )
+
+    assert response.status_code == 502
+    assert "HTTP 400 (INVALID_ARGUMENT)" in response.json()["detail"]
+    assert "provider response details stay private" not in response.json()["detail"]
+
+
+def test_chat_explains_quota_failure_and_local_fee_calculator(
+    monkeypatch,
+) -> None:
+    import app.api.routes as routes
+
+    class ProviderError(Exception):
+        code = 429
+        status = "RESOURCE_EXHAUSTED"
+
+    def fail_graph(_state: object) -> None:
+        raise ProviderError("provider response details stay private")
+
+    monkeypatch.setattr(routes.agent_graph, "invoke", fail_graph)
+    client = build_client()
+
+    response = client.post(
+        "/chat",
+        json={"session_id": "test-session", "message": "What is an ETF?"},
+    )
+
+    assert response.status_code == 502
+    assert "AI chat is temporarily unavailable" in response.json()["detail"]
+    assert "does not use Gemini" in response.json()["detail"]
+    assert "provider response details stay private" not in response.json()["detail"]
+
+
+def test_fee_endpoint_calculates_without_invoking_chat(monkeypatch) -> None:
+    import app.agent.graph as graph
+
+    def fail_graph(_state: object) -> None:
+        raise AssertionError("fee endpoint must not invoke the LLM")
+
+    monkeypatch.setattr(graph.agent_graph, "invoke", fail_graph)
+    client = build_client()
+
+    response = client.post(
+        "/fees",
+        json={"instrument_type": "etf", "side": "buy", "order_value": 2000},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["fee"] == 3.0
+    assert response.json()["fee_pct"] == 0.15
+    assert [part["amount"] for part in response.json()["breakdown"]] == [1, 2, 0]
+
+
+def test_fee_endpoint_rejects_invalid_input() -> None:
+    client = build_client()
+
+    response = client.post(
+        "/fees",
+        json={"instrument_type": "crypto", "side": "buy", "order_value": 2000},
+    )
+
+    assert response.status_code == 422
+
+
 def test_session_memory_keeps_six_turns_and_caps_size() -> None:
     memory = SessionMemory(max_turns=6, max_chars=500)
     for turn in range(7):

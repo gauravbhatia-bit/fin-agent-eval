@@ -1,8 +1,10 @@
 import json
 from pathlib import Path
 from typing import Any
+from unittest.mock import Mock
 
 import pytest
+import requests
 
 from ui.client import BackendClient, BackendError
 from ui.data import (
@@ -147,3 +149,45 @@ def test_health_check_does_not_retry_non_retryable_errors() -> None:
             sleep=lambda _: None,
         )
     assert client.attempts == 1
+
+
+def test_chat_uses_long_timeout_and_explains_backend_read_timeout() -> None:
+    session = Mock()
+    session.post.side_effect = requests.ReadTimeout("model response timed out")
+    client = BackendClient(
+        "http://backend",
+        session=session,
+        timeout_seconds=5,
+        chat_timeout_seconds=180,
+    )
+
+    with pytest.raises(BackendError, match="timed out while waiting for the backend"):
+        client.chat("session", "Calculate a fictional demo fee.")
+
+    assert session.post.call_args.kwargs["timeout"] == (5, 180)
+
+
+def test_chat_reports_connection_error_separately_from_timeout() -> None:
+    session = Mock()
+    session.post.side_effect = requests.ConnectionError("connection refused")
+    client = BackendClient("http://backend", session=session)
+
+    with pytest.raises(BackendError, match="chat service could not be reached"):
+        client.chat("session", "Calculate a fictional demo fee.")
+
+
+def test_fee_calculator_posts_structured_input_without_chat_timeout() -> None:
+    session = Mock()
+    response = Mock(ok=True)
+    response.json.return_value = {"fee": 3.0, "fee_pct": 0.15, "breakdown": []}
+    session.post.return_value = response
+    client = BackendClient("http://backend", session=session, timeout_seconds=5)
+
+    result = client.calculate_fee("etf", "buy", 2000)
+
+    assert result["fee"] == 3.0
+    session.post.assert_called_once_with(
+        "http://backend/fees",
+        json={"instrument_type": "etf", "side": "buy", "order_value": 2000},
+        timeout=5,
+    )

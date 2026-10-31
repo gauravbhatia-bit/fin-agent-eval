@@ -206,6 +206,30 @@ def test_gemini_adapter_parses_text_and_function_calls(
     assert models.kwargs["config"].automatic_function_calling.disable is True
 
 
+def test_gemini_client_configures_a_finite_http_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from google import genai
+
+    captured: dict[str, Any] = {}
+    fake_client = object()
+
+    def create_client(**kwargs: Any) -> object:
+        captured.update(kwargs)
+        return fake_client
+
+    monkeypatch.setattr(genai, "Client", create_client)
+    backend = GeminiClient(
+        Settings(
+            _env_file=None,
+            gemini_api_key="test-key",  # pragma: allowlist secret
+        )
+    )
+
+    assert backend.client is fake_client
+    assert captured["http_options"].timeout == 30_000
+
+
 def test_gemini_message_conversion_includes_function_responses() -> None:
     _, contents = GeminiClient._convert_messages(
         [
