@@ -114,8 +114,10 @@ class EvaluationRunner:
         traces: list[RunTrace] = []
         self._answer_embeddings: dict[tuple[str, int], list[float]] = {}
         self._embedding_cost = {}
+        self._previous_metrics: dict[str, Any] = {}
         if resume and self.output_path.exists():
             saved = json.loads(self.output_path.read_text(encoding="utf-8"))
+            self._previous_metrics = saved.get("previous_metrics", {})
             expected_metadata = {
                 "pack": self.settings.pack,
                 "mode": self.settings.llm_mode,
@@ -161,6 +163,20 @@ class EvaluationRunner:
             }
             if len(traces) == saved_trace_count:
                 self._embedding_cost = saved.get("answer_embedding_cost", {})
+        elif self.output_path.is_file():
+            try:
+                previous_report = json.loads(
+                    self.output_path.read_text(encoding="utf-8")
+                )
+            except (OSError, json.JSONDecodeError):
+                logger.warning(
+                    "Previous evaluation report is unreadable; delta comparison "
+                    "will be unavailable."
+                )
+            else:
+                previous_metrics = previous_report.get("metrics")
+                if isinstance(previous_metrics, dict):
+                    self._previous_metrics = previous_metrics
         completed = {(trace.case_id, trace.run_index) for trace in traces}
 
         for case in cases:
@@ -343,7 +359,7 @@ class EvaluationRunner:
         for key in ("llm_calls", "input_tokens", "output_tokens"):
             cost[key] += embedding_cost.get(key, 0)
         cost["answer_embedding_latency_ms"] = embedding_cost.get("latency_ms", 0)
-        return {
+        report = {
             "schema_version": 1,
             "git_sha": self.settings.git_sha,
             "prompt_version": PROMPT_VERSION,
@@ -386,6 +402,9 @@ class EvaluationRunner:
             "answer_embedding_cost": embedding_cost,
             "audit": audit_judgements(judge_labels, human_labels),
         }
+        if self._previous_metrics:
+            report["previous_metrics"] = self._previous_metrics
+        return report
 
     @staticmethod
     def _trace_passes(case: GoldenCase, trace: RunTrace) -> bool:

@@ -4,12 +4,13 @@ A local-first evaluation harness for a finance-education chatbot using fictional
 
 ## Status
 
-Phases 1-3 are implemented. Phase 3 adds the record/replay/live Gemini client, hybrid BM25/embedding retrieval, guarded LangGraph agent, and `POST /chat`. Phase 4 is underway: it adds reviewable golden cases, metrics, judge auditing, resumable evaluation runs, a quality gate, and report comparison. Later phases will add the UI and deployment workflows. No model names or API keys are configured, so live Gemini requests have not been tested.
+Phases 1-4 are implemented. Phase 3 adds the record/replay/live Gemini client, hybrid BM25/embedding retrieval, guarded LangGraph agent, and `POST /chat`. Phase 4 adds reviewable golden cases, metrics, judge auditing, resumable evaluation runs, a quality gate, and report comparison. Phase 5 adds a Streamlit UI backed only by the HTTP API. No model names or API keys are configured, so live Gemini requests have not been tested.
 
 ## Requirements
 
 - Python 3.12
 - Git
+- Streamlit (installed by project setup)
 - Docker Desktop for later container work
 
 On Windows, use the Python launcher to select Python 3.12:
@@ -36,6 +37,17 @@ Run the API locally after setup:
 ```
 
 Then open `http://127.0.0.1:8000/health` or `http://127.0.0.1:8000/version`.
+
+Run the Streamlit UI in a second terminal:
+
+```powershell
+py -3.12 tasks.py run-ui
+```
+
+Open `http://localhost:8501`. The UI reads `BACKEND_URL` (default
+`http://localhost:8000`) and retries the health check for up to 90 seconds to
+handle a backend cold start. When no evaluation has been run, the dashboard
+shows clearly marked sample data from `reports/sample_latest.json`.
 
 ## Fictional pack and tools
 
@@ -80,7 +92,15 @@ case/run pairs in the output report. Baseline targets are placeholders, not
 measured scores. Manually reviewed judge labels belong in
 `evals/human_labels.jsonl`; the audit reports unavailable until labels are
 provided. `GET /eval/latest` returns a summary of `reports/latest.json` when it
-exists.
+exists, or the clearly labelled sample report when no run report is present.
+
+## Streamlit UI (Phase 5)
+
+The UI has Chat, Evaluation, and About and limits tabs. It communicates with
+the backend only over HTTP using `BACKEND_URL`; it does not import application
+modules. Chat history remains in browser session state. The dashboard shows
+the sample report until a run report is available. Sample values and baseline
+thresholds are illustrative, not measured results.
 
 ## Roadmap
 

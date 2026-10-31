@@ -17,6 +17,8 @@ dependencies = [
     "pydantic-settings",
     "PyYAML",
     "rank-bm25",
+    "requests",
+    "streamlit",
     "tenacity",
     "uvicorn",
 ]
@@ -33,7 +35,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["app*", "evals*"]
+include = ["app*", "evals*", "ui*"]
 
 [tool.ruff]
 line-length = 88

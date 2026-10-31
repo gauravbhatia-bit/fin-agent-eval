@@ -15,6 +15,8 @@ from app.llm.client import PROMPT_VERSION, DailyCallBudget, LLMClient
 from app.schemas import HealthResponse, VersionResponse
 
 LATEST_REPORT = Path(__file__).resolve().parents[1] / "reports" / "latest.json"
+SAMPLE_REPORT = Path(__file__).resolve().parents[1] / "reports" / "sample_latest.json"
+BASELINE_REPORT = Path(__file__).resolve().parents[1] / "evals" / "baseline.json"
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -71,19 +73,51 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @application.get("/eval/latest")
     def latest_evaluation() -> JSONResponse:
-        """Return the locally written latest report summary, if one exists."""
-        if not LATEST_REPORT.is_file():
+        """Return a dashboard-safe report summary or the clearly marked sample."""
+        report_path = LATEST_REPORT if LATEST_REPORT.is_file() else SAMPLE_REPORT
+        if not report_path.is_file():
             raise HTTPException(
                 status_code=404,
                 detail="No evaluation report is available yet.",
             )
         try:
-            report = json.loads(LATEST_REPORT.read_text(encoding="utf-8"))
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            baseline = json.loads(BASELINE_REPORT.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
             raise HTTPException(
                 status_code=503,
                 detail="The latest evaluation report is unavailable.",
             ) from error
+        if (
+            not isinstance(report, dict)
+            or not isinstance(baseline, dict)
+            or not isinstance(report.get("metrics"), dict)
+            or not isinstance(report.get("audit"), dict)
+            or not isinstance(report.get("cases"), list)
+            or not isinstance(baseline.get("metrics"), dict)
+            or not isinstance(baseline.get("lower_is_better", []), list)
+            or not isinstance(baseline.get("tolerance_pct_points"), (int, float))
+            or (
+                "previous_metrics" in report
+                and not isinstance(report["previous_metrics"], dict)
+            )
+        ):
+            raise HTTPException(
+                status_code=503,
+                detail="The latest evaluation report is unavailable.",
+            )
+        report_cases = report["cases"]
+        for row in report_cases:
+            if (
+                not isinstance(row, dict)
+                or not isinstance(row.get("case"), dict)
+                or not isinstance(row.get("runs"), list)
+                or any(not isinstance(run, dict) for run in row["runs"])
+            ):
+                raise HTTPException(
+                    status_code=503,
+                    detail="The latest evaluation report is unavailable.",
+                )
         summary = {
             key: report[key]
             for key in (
@@ -97,9 +131,40 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "k",
                 "metrics",
                 "audit",
+                "previous_metrics",
             )
             if key in report
         }
+        summary["cases"] = [
+            {
+                "id": row["case"].get("id", "unknown"),
+                "category": row["case"].get("category", "unknown"),
+                "question": row["case"].get("question", ""),
+                "expected_decision": row["case"].get("expected_decision", "no_answer"),
+                "pass": bool(row.get("pass", False)),
+                "actual_decisions": [
+                    run["decision"]
+                    for run in row["runs"]
+                    if isinstance(run.get("decision"), str)
+                ],
+            }
+            for row in report_cases
+        ]
+        summary["baseline"] = {
+            key: baseline[key]
+            for key in (
+                "placeholder",
+                "tolerance_pct_points",
+                "metrics",
+                "lower_is_better",
+            )
+            if key in baseline
+        }
+        summary["is_sample"] = report_path == SAMPLE_REPORT or report.get(
+            "is_sample", False
+        )
+        if "previous_metrics" in report:
+            summary["previous_metrics"] = report["previous_metrics"]
         return JSONResponse(content=summary)
 
     return application

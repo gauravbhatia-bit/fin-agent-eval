@@ -4,6 +4,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+.pytest-basetemp/
 .ruff_cache/
 .cache/
 .coverage
@@ -12,6 +13,7 @@ build/
 dist/
 reports/*
 !reports/.gitkeep
+!reports/sample_latest.json
 .terraform/
 *.tfstate
 *.tfstate.*

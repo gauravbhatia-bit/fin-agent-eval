@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -41,6 +43,11 @@ def test_latest_evaluation_returns_not_found_without_report(
         "LATEST_REPORT",
         tmp_path / "missing.json",
     )
+    monkeypatch.setattr(
+        main_module,
+        "SAMPLE_REPORT",
+        tmp_path / "missing-sample.json",
+    )
 
     response = client.get("/eval/latest")
 
@@ -48,7 +55,7 @@ def test_latest_evaluation_returns_not_found_without_report(
     assert response.json()["detail"] == "No evaluation report is available yet."
 
 
-def test_latest_evaluation_returns_only_the_report_summary(
+def test_latest_evaluation_returns_dashboard_data_without_raw_traces(
     monkeypatch,
     tmp_path,
 ) -> None:
@@ -64,14 +71,105 @@ def test_latest_evaluation_returns_only_the_report_summary(
                 "n": 2,
                 "k": 3,
                 "metrics": {},
+                "previous_metrics": {"decision_accuracy": {"value": 0.5}},
+                "audit": {"status": "not_available"},
+                "cases": [
+                    {
+                        "case": {
+                            "id": "case-1",
+                            "category": "answerable",
+                            "question": "Question?",
+                            "expected_decision": "answered",
+                        },
+                        "pass": False,
+                        "runs": [{"decision": "refused"}],
+                    }
+                ],
                 "traces": [{"answer": "omitted"}],
             }
         ),
         encoding="utf-8",
     )
+    baseline_path = tmp_path / "baseline.json"
+    baseline_path.write_text(
+        json.dumps(
+            {
+                "placeholder": True,
+                "tolerance_pct_points": 3,
+                "metrics": {"decision_accuracy": 0.85},
+                "lower_is_better": [],
+            }
+        ),
+        encoding="utf-8",
+    )
     monkeypatch.setattr(main_module, "LATEST_REPORT", path)
+    monkeypatch.setattr(main_module, "BASELINE_REPORT", baseline_path)
 
     response = client.get("/eval/latest")
 
     assert response.status_code == 200
-    assert response.json() == {"git_sha": "abc", "n": 2, "k": 3, "metrics": {}}
+    assert response.json() == {
+        "git_sha": "abc",
+        "n": 2,
+        "k": 3,
+        "metrics": {},
+        "previous_metrics": {"decision_accuracy": {"value": 0.5}},
+        "audit": {"status": "not_available"},
+        "cases": [
+            {
+                "id": "case-1",
+                "category": "answerable",
+                "question": "Question?",
+                "expected_decision": "answered",
+                "pass": False,
+                "actual_decisions": ["refused"],
+            }
+        ],
+        "baseline": {
+            "placeholder": True,
+            "tolerance_pct_points": 3,
+            "metrics": {"decision_accuracy": 0.85},
+            "lower_is_better": [],
+        },
+        "is_sample": False,
+    }
+
+
+def test_latest_evaluation_uses_sample_report_when_no_run_exists(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    import app.main as main_module
+
+    monkeypatch.setattr(main_module, "LATEST_REPORT", tmp_path / "missing.json")
+    monkeypatch.setattr(
+        main_module,
+        "SAMPLE_REPORT",
+        Path(__file__).resolve().parents[2] / "reports" / "sample_latest.json",
+    )
+
+    response = client.get("/eval/latest")
+
+    assert response.status_code == 200
+    assert response.json()["is_sample"] is True
+    assert len(response.json()["cases"]) == 4
+    assert response.json()["cases"][0]["actual_decisions"] == ["answered", "answered"]
+    assert response.json()["baseline"]["placeholder"] is True
+
+
+def test_latest_evaluation_rejects_malformed_report(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    import app.main as main_module
+
+    report_path = tmp_path / "report.json"
+    report_path.write_text("[]", encoding="utf-8")
+    baseline_path = Path(__file__).resolve().parents[2] / "evals" / "baseline.json"
+    monkeypatch.setattr(main_module, "LATEST_REPORT", report_path)
+    monkeypatch.setattr(main_module, "BASELINE_REPORT", baseline_path)
+
+    response = client.get("/eval/latest")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "The latest evaluation report is unavailable."
