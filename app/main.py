@@ -59,6 +59,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             version=app_settings.git_sha,
             pack=app_settings.pack,
             llm_mode=app_settings.llm_mode,
+            model_chat_configured=(
+                app_settings.llm_mode in {"live", "record"}
+                and app_settings.gemini_api_key is not None
+                and bool(app_settings.gemini_api_key.get_secret_value().strip())
+            ),
         )
 
     @application.get("/version", response_model=VersionResponse)
