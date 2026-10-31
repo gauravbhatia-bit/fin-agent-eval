@@ -1,4 +1,6 @@
 import json
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
@@ -149,6 +151,16 @@ def test_health_check_does_not_retry_non_retryable_errors() -> None:
             sleep=lambda _: None,
         )
     assert client.attempts == 1
+
+
+def test_streamlit_entrypoint_imports_from_its_directory() -> None:
+    subprocess.run(
+        [sys.executable, "-c", "import app"],
+        cwd=ROOT / "ui",
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 
 def test_chat_uses_long_timeout_and_explains_backend_read_timeout() -> None:

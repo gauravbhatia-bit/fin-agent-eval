@@ -6,14 +6,24 @@ from uuid import uuid4
 
 import streamlit as st
 
-from ui.client import BackendClient, BackendError
-from ui.data import (
-    confusion_matrix,
-    consistency_by_category,
-    failed_cases,
-    metric_deltas,
-    metric_rows,
-)
+if __package__:
+    from .client import BackendClient, BackendError
+    from .data import (
+        confusion_matrix,
+        consistency_by_category,
+        failed_cases,
+        metric_deltas,
+        metric_rows,
+    )
+else:
+    from client import BackendClient, BackendError
+    from data import (
+        confusion_matrix,
+        consistency_by_category,
+        failed_cases,
+        metric_deltas,
+        metric_rows,
+    )
 
 REPOSITORY_URL = "https://github.com/gauravbhatia-bit/fin-agent-eval"
 EXAMPLE_QUESTIONS = (
