@@ -22,6 +22,12 @@ py -3.12 tasks.py test
 
 The setup command creates a local `.venv`, installs the pinned dependencies from `requirements.txt`, and installs the pre-commit hooks. It does not require an API key.
 
+After changing dependencies, regenerate the cross-platform lock with:
+
+```powershell
+py -3.12 -m piptools compile --allow-unsafe --generate-hashes --extra dev --output-file requirements.txt pyproject.toml
+```
+
 Run the API locally after setup:
 
 ```powershell
