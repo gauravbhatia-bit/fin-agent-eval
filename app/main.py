@@ -1,37 +1,70 @@
 """FastAPI application entry point."""
 
 from importlib.metadata import version
-from typing import Annotated
 
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes import router as chat_router
+from app.api.runtime import ChatRuntime, IpRateLimiter, SessionMemory
 from app.config import Settings, get_settings
+from app.llm.client import PROMPT_VERSION, DailyCallBudget, LLMClient
 from app.schemas import HealthResponse, VersionResponse
 
-app = FastAPI(title="fin-agent-eval", version=version("fin-agent-eval"))
 
-
-@app.get("/health", response_model=HealthResponse)
-def health(settings: Annotated[Settings, Depends(get_settings)]) -> HealthResponse:
-    """Return lightweight service health without making an LLM call."""
-    return HealthResponse(
-        status="ok",
-        version=settings.git_sha,
-        pack=settings.pack,
-        llm_mode=settings.llm_mode,
+def create_app(settings: Settings | None = None) -> FastAPI:
+    """Create the API and its process-local chat runtime."""
+    app_settings = settings or get_settings()
+    application = FastAPI(
+        title="fin-agent-eval",
+        version=version("fin-agent-eval"),
     )
-
-
-@app.get("/version", response_model=VersionResponse)
-def get_version(
-    settings: Annotated[Settings, Depends(get_settings)],
-) -> VersionResponse:
-    """Return the current build and configured model names."""
-    return VersionResponse(
-        git_sha=settings.git_sha,
-        app_version=version("fin-agent-eval"),
-        prompt_version=None,
-        gemini_model=settings.gemini_model or None,
-        gemini_judge_model=settings.gemini_judge_model or None,
-        gemini_embed_model=settings.gemini_embed_model or None,
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            origin.strip()
+            for origin in app_settings.allowed_origins.split(",")
+            if origin.strip()
+        ],
+        allow_credentials=False,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type"],
     )
+    llm_client = LLMClient(
+        app_settings,
+        budget=DailyCallBudget(app_settings.daily_call_cap),
+    )
+    application.state.runtime = ChatRuntime(
+        settings=app_settings,
+        llm_client=llm_client,
+        session_memory=SessionMemory(),
+        rate_limiter=IpRateLimiter(),
+    )
+    application.include_router(chat_router)
+
+    @application.get("/health", response_model=HealthResponse)
+    def health() -> HealthResponse:
+        """Return lightweight service health without making an LLM call."""
+        return HealthResponse(
+            status="ok",
+            version=app_settings.git_sha,
+            pack=app_settings.pack,
+            llm_mode=app_settings.llm_mode,
+        )
+
+    @application.get("/version", response_model=VersionResponse)
+    def get_version() -> VersionResponse:
+        """Return the current build and configured model names."""
+        return VersionResponse(
+            git_sha=app_settings.git_sha,
+            app_version=version("fin-agent-eval"),
+            prompt_version=PROMPT_VERSION,
+            gemini_model=app_settings.gemini_model or None,
+            gemini_judge_model=app_settings.gemini_judge_model or None,
+            gemini_embed_model=app_settings.gemini_embed_model or None,
+        )
+
+    return application
+
+
+app = create_app()

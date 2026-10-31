@@ -15,5 +15,16 @@ rule_patterns:
     - '(?i)\b(best|right)\s+(etf|stock|fund)\s+for\s+me\b'
   prediction_request:
     - '(?i)\b(will|guaranteed to)\s+.{0,30}\b(go up|rise|double|profit)\b'
+    - '(?i)\b(will|could)\s+(it|this|the (?:etf|stock|fund))\s+(go up|rise|double|make a profit)\b'
+    - '(?i)\bguarantee(?:d)?\s+(?:a\s+)?(?:return|profit|growth)\b'
   injection:
     - '(?i)\b(ignore|disregard)\s+(all\s+)?(previous|prior|safety)\s+instructions\b'
+    - '(?i)\b(reveal|show|print)\s+(?:the\s+)?(?:system|hidden|developer)\s+(?:prompt|instructions)\b'
+  account_specific:
+    - '(?i)\b(my|our)\s+(account|balance|portfolio|order|transaction|deposit|withdrawal)\b'
+    - '(?i)\b(cancel|place|execute)\s+(?:my\s+)?(?:order|trade|transaction)\b'
+  complaint:
+    - '(?i)\b(file|make|submit)\s+(?:a\s+)?complaint\b'
+    - '(?i)\b(speak|talk)\s+to\s+(?:a\s+)?(?:human|person|support|agent)\b'
+  tax_legal:
+    - '(?i)\b(tax|taxes|taxation|legal advice|lawyer)\b'

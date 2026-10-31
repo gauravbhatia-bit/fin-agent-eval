@@ -4,7 +4,7 @@ A local-first evaluation harness for a finance-education chatbot using fictional
 
 ## Status
 
-Phases 1 and 2 are complete: the local scaffold, fictional `eu_us_etf` domain pack, and deterministic tool registry have passing tests. Later phases will add the chatbot, evaluation harness, UI, and deployment workflows. No model names have been configured yet.
+Phases 1-3 are implemented. Phase 3 adds the record/replay/live Gemini client, hybrid BM25/embedding retrieval, guarded LangGraph agent, and `POST /chat`. Later phases will add the evaluation harness, UI, and deployment workflows. No model names or API keys are configured, so live Gemini requests have not been tested.
 
 ## Requirements
 
@@ -40,7 +40,11 @@ Then open `http://127.0.0.1:8000/health` or `http://127.0.0.1:8000/version`.
 
 The `packs/eu_us_etf/` files contain invented DemoBroker fees, instruments, and dated currency rates. They are for software tests only and are not current real-world data. Its 18 knowledge documents are unverified drafts; educational descriptions marked `TODO(verify)` need owner review before being treated as verified.
 
-The tool registry in `app/tools/registry.py` exposes fee, hypothetical-growth, currency-conversion, instrument-lookup, position-size, knowledge-search, and simulated-escalation tools. Each request is validated with Pydantic. Invalid arguments return an explicit error. The Phase 2 knowledge search uses deterministic keyword overlap; Phase 3 will provide the hybrid retriever.
+The tool registry in `app/tools/registry.py` exposes fee, hypothetical-growth, currency-conversion, instrument-lookup, position-size, knowledge-search, and simulated-escalation tools. Each request is validated with Pydantic. Invalid arguments return an explicit error. `POST /chat` applies policy rules before LLM calls, uses a manually bounded tool loop, and validates document citations. In-memory sessions retain up to six turns for 30 minutes and are lost on restart. The hybrid retriever caches document embeddings locally, separated by embedding model.
+
+## Gemini models and quotas
+
+The Gemini API model identifiers documented when Phase 3 started include `gemini-3.8-flash` and `gemini-embedding-2`. Model names are configuration values, not code constants. Free-tier access is limited to certain models, and per-project RPM/TPM/RPD limits vary; check your active limits in [AI Studio](https://aistudio.google.com/rate-limit?timeRange=last-28-days) and the official [models](https://ai.google.dev/gemini-api/docs/models), [pricing](https://ai.google.dev/gemini-api/docs/pricing), and [rate limits](https://ai.google.dev/gemini-api/docs/rate-limits) pages before setting `.env`. Free-tier requests may be used to improve Google's products; use only synthetic content.
 
 ## Configuration
 
@@ -50,7 +54,7 @@ Copy `.env.example` to `.env` to configure the application. Do not commit `.env`
 
 All broker data planned for this project is fictional and will be labelled as such. The application is educational only; it will not place trades, connect to brokerages, make predictions, or provide personalised investment, tax, or legal advice. Knowledge documents are a demo corpus and must not be treated as verified financial guidance.
 
-The prototype will have no authentication and will use in-memory sessions. A live model run requires a separately configured Gemini API key and may incur quota usage. Replay mode is intended for offline deterministic tests; it does not measure live model quality.
+The prototype has no authentication and uses per-process rate limits, a daily call counter, and in-memory sessions. A live model run requires a separately configured Gemini API key and model IDs, and may incur quota usage. Replay mode is intended for offline deterministic tests; it does not measure live model quality. Tests use fake model backends and do not require credentials or network access.
 
 ## Roadmap
 

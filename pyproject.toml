@@ -9,9 +9,15 @@ description = "Evaluation harness for a finance-education chatbot using fictiona
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "faiss-cpu",
     "fastapi",
+    "google-genai",
+    "langgraph",
+    "numpy",
     "pydantic-settings",
     "PyYAML",
+    "rank-bm25",
+    "tenacity",
     "uvicorn",
 ]
 
