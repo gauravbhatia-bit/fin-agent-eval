@@ -1,4 +1,4 @@
-FROM python:3.12-slim AS builder
+FROM python:3.15-slim AS builder
 
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
@@ -13,7 +13,7 @@ COPY evals ./evals
 COPY packs ./packs
 RUN pip install --no-cache-dir --no-deps --no-build-isolation .
 
-FROM python:3.12-slim AS runtime
+FROM python:3.15-slim AS runtime
 
 ARG GIT_SHA=dev
 ENV PATH="/opt/venv/bin:${PATH}" \
