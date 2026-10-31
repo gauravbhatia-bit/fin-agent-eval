@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fin-agent-eval"
+version = "0.1.0"
+description = "Evaluation harness for a finance-education chatbot using fictional demo data"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi",
+    "pydantic-settings",
+    "uvicorn[standard]",
+]
+
+[project.optional-dependencies]
+dev = [
+    "httpx",
+    "pip-tools",
+    "pre-commit",
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "setuptools",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*", "evals*"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.coverage.run]
+branch = true
+source = ["app", "evals"]
