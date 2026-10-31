@@ -4,7 +4,27 @@ A local-first evaluation harness for a finance-education chatbot using fictional
 
 ## Status
 
-Phases 1-7 are implemented. Phase 3 adds the record/replay/live Gemini client, hybrid BM25/embedding retrieval, guarded LangGraph agent, and `POST /chat`. Phase 4 adds reviewable golden cases, metrics, judge auditing, resumable evaluation runs, a quality gate, and report comparison. Phase 5 adds a Streamlit UI backed only by the HTTP API. Phase 6 packages the API and UI for local Docker use. Phase 7 adds GitHub Actions checks and Dependabot. Phase 8's free-tier deployment preview is live, but Gemini is not configured. API keys are not committed; live Gemini requests may use quota.
+Phases 1-7 are implemented. Phase 3 adds the record/replay/live Gemini client, hybrid BM25/embedding retrieval, guarded LangGraph agent, and `POST /chat`. Phase 4 adds reviewable golden cases, metrics, judge auditing, resumable evaluation runs, a quality gate, and report comparison. Phase 5 adds a Streamlit UI backed only by the HTTP API. Phase 6 packages the API and UI for local Docker use. Phase 7 adds GitHub Actions checks and Dependabot. The free-tier deployment is live; Gemini is intentionally not configured in the public demo. API keys are not committed; live Gemini requests may use quota.
+
+## Recruiter quick tour
+
+- **[Open the live demo](https://fin-agent-eval-chat.streamlit.app/).** The fee
+  calculator and deterministic safety refusal work without a Gemini key. Live
+  model chat is visibly disabled in this public deployment.
+- **See the design:** `app/agent/nodes.py` contains the rule-first guard and
+  bounded tool loop; `app/tools/registry.py` validates and dispatches tools;
+  `evals/runner.py` and `evals/metrics.py` implement repeatable evaluation.
+- **See the verification:** run `py -3.12 tasks.py test` and
+  `py -3.12 tasks.py lint`. GitHub Actions runs tests, deterministic smoke
+  checks, and a Docker health/fee check on pull requests.
+- **Read evaluation results honestly:** the deployed evaluation view uses
+  explicitly labelled sample data unless a reviewed live/replay report exists.
+  The sample is illustrative—not measured model quality—and the current
+  baseline thresholds are placeholders.
+
+The project demonstrates safety routing, structured tool calls, replayable
+evaluation, and operational trade-offs. It is a portfolio prototype, not a
+production financial service.
 
 ## Requirements
 
@@ -200,12 +220,9 @@ without putting a key in GitHub or changing the code:
 4. Test with non-sensitive questions, check service logs and quota, and remove
    the key from Render if you no longer want live calls.
 
-The evaluation judge is separate from user-facing chat. The current judge is
-Gemini-backed; a local judge is not currently implemented. A small local model
-could be explored for offline evaluation on a development machine, but it is
-not a drop-in provider and is not recommended on Render's 512 MB free instance.
-Any replacement judge should be validated against human-reviewed labels before
-its scores are used.
+The evaluation judge is separate from user-facing chat and currently uses
+Gemini. The hosted demo has no Gemini key, so its evaluation view shows only the
+labelled sample report; sample scores are not measured results.
 
 This is a manual, review-first deployment; no Terraform apply or automatic
 release workflow is configured.

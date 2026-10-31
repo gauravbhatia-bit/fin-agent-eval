@@ -2,13 +2,14 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.config import Settings
+from app.main import app, create_app
 
 client = TestClient(app)
 
 
 def test_health_returns_service_status_and_build_sha() -> None:
-    response = client.get("/health")
+    response = TestClient(create_app(Settings(_env_file=None))).get("/health")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -16,7 +17,39 @@ def test_health_returns_service_status_and_build_sha() -> None:
         "version": "dev",
         "pack": "eu_us_etf",
         "llm_mode": "live",
+        "model_chat_configured": False,
     }
+
+
+def test_health_reports_model_chat_configuration_without_exposing_key() -> None:
+    client_with_key = TestClient(
+        create_app(
+            Settings(
+                _env_file=None,
+                gemini_api_key="placeholder",  # pragma: allowlist secret
+            )
+        )
+    )
+
+    response = client_with_key.get("/health")
+
+    assert response.status_code == 200
+    assert response.json()["model_chat_configured"] is True
+    assert "placeholder" not in response.text
+
+
+def test_replay_mode_does_not_report_live_model_chat_as_configured() -> None:
+    replay_client = TestClient(
+        create_app(
+            Settings(
+                _env_file=None,
+                llm_mode="replay",
+                gemini_api_key="placeholder",  # pragma: allowlist secret
+            )
+        )
+    )
+
+    assert replay_client.get("/health").json()["model_chat_configured"] is False
 
 
 def test_version_returns_build_and_model_configuration() -> None:

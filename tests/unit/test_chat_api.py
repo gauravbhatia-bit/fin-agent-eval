@@ -32,6 +32,22 @@ def test_chat_returns_required_schema_for_rule_refusal() -> None:
     assert response.json()["trace_id"]
 
 
+def test_deterministic_advice_refusal_works_without_a_gemini_key() -> None:
+    client = build_client()
+
+    response = client.post(
+        "/chat",
+        json={
+            "session_id": "recruiter-demo",
+            "message": "Should I buy DEMO-WORLD-ETF?",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["decision"] == "refused"
+    assert "can't recommend what you should buy" in response.json()["answer"]
+
+
 def test_chat_rejects_empty_and_over_configured_length() -> None:
     client = build_client(max_input_chars=10)
 

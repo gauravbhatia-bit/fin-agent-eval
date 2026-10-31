@@ -63,12 +63,19 @@ def _backend_url() -> str:
     return secret_url.strip()
 
 
-def _render_chat(client: BackendClient) -> None:
+def _render_chat(client: BackendClient, *, model_chat_configured: bool) -> None:
     st.subheader("Chat")
     st.caption(
         "Chat history is held in this browser session and is not stored by the UI. "
         "Use the local fee calculator below for calculations that do not require AI."
     )
+    if not model_chat_configured:
+        st.info(
+            "Live AI chat is disabled in this public demo because no Gemini key is "
+            "configured. Try “Should I buy?” for a deterministic safety refusal, "
+            "or use the fictional fee calculator below. Other chat examples are "
+            "disabled; no model-quality results are claimed for this deployment."
+        )
     _render_fee_calculator(client)
     if "chat_session_id" not in st.session_state:
         st.session_state.chat_session_id = uuid4().hex
@@ -78,7 +85,12 @@ def _render_chat(client: BackendClient) -> None:
     st.write("Try an example:")
     columns = st.columns(2)
     for index, (label, question) in enumerate(EXAMPLE_QUESTIONS):
-        if columns[index % 2].button(label, key=f"example-{index}"):
+        deterministic_demo = question == "Should I buy DEMO-WORLD-ETF?"
+        if columns[index % 2].button(
+            label,
+            key=f"example-{index}",
+            disabled=not model_chat_configured and not deterministic_demo,
+        ):
             st.session_state.pending_question = question
 
     for turn in st.session_state.chat_turns:
@@ -87,7 +99,10 @@ def _render_chat(client: BackendClient) -> None:
         with st.chat_message("assistant"):
             _render_answer(turn["response"])
 
-    typed_question = st.chat_input("Ask an educational question")
+    typed_question = st.chat_input(
+        "Ask an educational question",
+        disabled=not model_chat_configured,
+    )
     question = typed_question or st.session_state.pop("pending_question", None)
     if not question:
         return
@@ -313,7 +328,7 @@ def main() -> None:
             expanded=False,
         ) as status:
             try:
-                client.wait_for_health(
+                backend_health = client.wait_for_health(
                     timeout_seconds=90,
                     on_retry=lambda elapsed: status.update(
                         label=(
@@ -327,13 +342,16 @@ def main() -> None:
                 st.error(str(error))
                 st.stop()
             status.update(label="Backend is ready.", state="complete")
+        st.session_state.backend_health = backend_health
         st.session_state.backend_ready = True
 
+    backend_health = st.session_state.get("backend_health", {})
+    model_chat_configured = backend_health.get("model_chat_configured") is True
     chat_tab, evaluation_tab, about_tab = st.tabs(
         ["Chat", "Evaluation", "About and limits"]
     )
     with chat_tab:
-        _render_chat(client)
+        _render_chat(client, model_chat_configured=model_chat_configured)
     with evaluation_tab:
         _render_evaluation(client)
     with about_tab:

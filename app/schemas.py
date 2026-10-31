@@ -10,6 +10,7 @@ class HealthResponse(BaseModel):
     version: str
     pack: str
     llm_mode: str
+    model_chat_configured: bool
 
 
 class VersionResponse(BaseModel):
