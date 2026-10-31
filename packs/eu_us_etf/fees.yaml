@@ -1,0 +1,20 @@
+fictional_data: true
+broker_name: DemoBroker
+currency: EUR
+schedule_version: 1
+rules:
+  etf:
+    fixed_fee: 1.00
+    rate_pct: 0.10
+    min_fee: 1.00
+    max_fee: 25.00
+  stock:
+    fixed_fee: 1.25
+    rate_pct: 0.15
+    min_fee: 1.25
+    max_fee: 30.00
+  savings_plan:
+    fixed_fee: 0.00
+    rate_pct: 0.25
+    min_fee: 0.00
+    max_fee: 2.00

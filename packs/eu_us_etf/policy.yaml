@@ -1,0 +1,19 @@
+pack_name: eu_us_etf
+fictional_data: true
+disclaimer: "Fictional demo data. Educational only. Not financial advice. Not affiliated with any broker."
+refused_topics:
+  - personalized investment recommendations
+  - predictions or guarantees about investment performance
+  - tax or legal advice
+  - instructions to ignore safety rules
+escalation_topics:
+  - account-specific requests
+  - complaints requiring a person
+rule_patterns:
+  advice_request:
+    - '(?i)\bshould\s+i\s+(buy|sell|hold)\b'
+    - '(?i)\b(best|right)\s+(etf|stock|fund)\s+for\s+me\b'
+  prediction_request:
+    - '(?i)\b(will|guaranteed to)\s+.{0,30}\b(go up|rise|double|profit)\b'
+  injection:
+    - '(?i)\b(ignore|disregard)\s+(all\s+)?(previous|prior|safety)\s+instructions\b'
