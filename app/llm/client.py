@@ -1,6 +1,7 @@
 """Record/replay/live LLM facade with a shared daily API-call budget."""
 
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
@@ -21,6 +22,17 @@ from app.llm.types import (
 )
 
 CASSETTE_DIRECTORY = Path(__file__).resolve().parents[2] / "evals" / "cassettes"
+
+
+@dataclass(frozen=True)
+class CallStat:
+    """Successful facade operation metadata used by evaluation traces."""
+
+    kind: str
+    purpose: str
+    input_tokens: int
+    output_tokens: int
+    latency_ms: float
 
 
 class LLMBackend(Protocol):
@@ -109,6 +121,14 @@ class LLMClient:
         self.cassettes = cassette_store or CassetteStore(CASSETTE_DIRECTORY)
         self.budget = budget or DailyCallBudget(settings.daily_call_cap)
         self._sleeper = sleeper
+        self._call_stats: list[CallStat] = []
+        self._stats_lock = Lock()
+
+    @property
+    def call_stats(self) -> list[CallStat]:
+        """Return a snapshot of successfully completed client operations."""
+        with self._stats_lock:
+            return self._call_stats.copy()
 
     def generate(
         self,
@@ -136,7 +156,17 @@ class LLMClient:
             request.model_copy(update={"messages": self._normalize_messages(messages)})
         )
         if self.settings.llm_mode == "replay":
-            return self.cassettes.get_generation(request_hash)
+            result = self.cassettes.get_generation(request_hash)
+            self._record_stats(
+                CallStat(
+                    kind="generation",
+                    purpose=purpose,
+                    input_tokens=result.input_tokens,
+                    output_tokens=result.output_tokens,
+                    latency_ms=result.latency_ms,
+                )
+            )
+            return result
         result = self._with_retries(
             lambda: self.backend.generate(
                 model=model,
@@ -149,6 +179,15 @@ class LLMClient:
         )
         if self.settings.llm_mode == "record":
             self.cassettes.put_generation(request_hash, result)
+        self._record_stats(
+            CallStat(
+                kind="generation",
+                purpose=purpose,
+                input_tokens=result.input_tokens,
+                output_tokens=result.output_tokens,
+                latency_ms=result.latency_ms,
+            )
+        )
         return result
 
     def embed(
@@ -170,7 +209,17 @@ class LLMClient:
         )
         request_hash = self.cassettes.request_hash(request)
         if self.settings.llm_mode == "replay":
-            return self.cassettes.get_embedding(request_hash)
+            result = self.cassettes.get_embedding(request_hash)
+            self._record_stats(
+                CallStat(
+                    kind="embedding",
+                    purpose=purpose,
+                    input_tokens=result.input_tokens,
+                    output_tokens=0,
+                    latency_ms=result.latency_ms,
+                )
+            )
+            return result
         result = self._with_retries(
             lambda: self.backend.embed(
                 model=model,
@@ -180,6 +229,15 @@ class LLMClient:
         )
         if self.settings.llm_mode == "record":
             self.cassettes.put_embedding(request_hash, result)
+        self._record_stats(
+            CallStat(
+                kind="embedding",
+                purpose=purpose,
+                input_tokens=result.input_tokens,
+                output_tokens=0,
+                latency_ms=result.latency_ms,
+            )
+        )
         return result
 
     def _model_for(self, purpose: str) -> str:
@@ -210,6 +268,10 @@ class LLMClient:
                 self.budget.consume()
                 return operation()
         raise RuntimeError("LLM retry loop ended unexpectedly.")
+
+    def _record_stats(self, stats: CallStat) -> None:
+        with self._stats_lock:
+            self._call_stats.append(stats)
 
     @staticmethod
     def _normalize_messages(

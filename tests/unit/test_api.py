@@ -28,3 +28,50 @@ def test_version_returns_build_and_model_configuration() -> None:
     assert payload["gemini_model"] is None
     assert payload["gemini_judge_model"] is None
     assert payload["gemini_embed_model"] is None
+
+
+def test_latest_evaluation_returns_not_found_without_report(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    import app.main as main_module
+
+    monkeypatch.setattr(
+        main_module,
+        "LATEST_REPORT",
+        tmp_path / "missing.json",
+    )
+
+    response = client.get("/eval/latest")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "No evaluation report is available yet."
+
+
+def test_latest_evaluation_returns_only_the_report_summary(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    import json
+
+    import app.main as main_module
+
+    path = tmp_path / "report.json"
+    path.write_text(
+        json.dumps(
+            {
+                "git_sha": "abc",
+                "n": 2,
+                "k": 3,
+                "metrics": {},
+                "traces": [{"answer": "omitted"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(main_module, "LATEST_REPORT", path)
+
+    response = client.get("/eval/latest")
+
+    assert response.status_code == 200
+    assert response.json() == {"git_sha": "abc", "n": 2, "k": 3, "metrics": {}}

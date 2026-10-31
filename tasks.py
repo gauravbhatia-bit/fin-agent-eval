@@ -82,11 +82,84 @@ def run_api() -> None:
     )
 
 
+def eval_smoke() -> None:
+    """Run the small replay smoke suite; matching cassettes must be recorded."""
+    run(
+        [
+            str(VENV_PYTHON),
+            "-m",
+            "evals.runner",
+            "--subset",
+            "smoke",
+            "--mode",
+            "replay",
+            "--allow-draft",
+        ]
+    )
+
+
+def eval_full() -> None:
+    """Run the approved full golden suite against the configured live model."""
+    run(
+        [
+            str(VENV_PYTHON),
+            "-m",
+            "evals.runner",
+            "--subset",
+            "full",
+            "--mode",
+            "live",
+        ]
+    )
+
+
+def eval_record() -> None:
+    """Record the smoke suite with live calls for later deterministic replay."""
+    run(
+        [
+            str(VENV_PYTHON),
+            "-m",
+            "evals.runner",
+            "--subset",
+            "smoke",
+            "--mode",
+            "record",
+            "--allow-draft",
+        ]
+    )
+
+
+def gate() -> None:
+    """Compare the latest evaluation report with the quality baseline."""
+    run([str(VENV_PYTHON), "-m", "evals.gate"])
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("task", choices=["setup", "lint", "test", "run-api"])
+    parser.add_argument(
+        "task",
+        choices=[
+            "setup",
+            "lint",
+            "test",
+            "run-api",
+            "eval-smoke",
+            "eval-full",
+            "eval-record",
+            "gate",
+        ],
+    )
     task = parser.parse_args().task
-    tasks = {"setup": setup, "lint": lint, "test": test, "run-api": run_api}
+    tasks = {
+        "setup": setup,
+        "lint": lint,
+        "test": test,
+        "run-api": run_api,
+        "eval-smoke": eval_smoke,
+        "eval-full": eval_full,
+        "eval-record": eval_record,
+        "gate": gate,
+    }
     tasks[task]()
 
 

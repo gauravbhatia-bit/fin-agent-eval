@@ -1,15 +1,20 @@
 """FastAPI application entry point."""
 
+import json
 from importlib.metadata import version
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.routes import router as chat_router
 from app.api.runtime import ChatRuntime, IpRateLimiter, SessionMemory
 from app.config import Settings, get_settings
 from app.llm.client import PROMPT_VERSION, DailyCallBudget, LLMClient
 from app.schemas import HealthResponse, VersionResponse
+
+LATEST_REPORT = Path(__file__).resolve().parents[1] / "reports" / "latest.json"
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -63,6 +68,39 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             gemini_judge_model=app_settings.gemini_judge_model or None,
             gemini_embed_model=app_settings.gemini_embed_model or None,
         )
+
+    @application.get("/eval/latest")
+    def latest_evaluation() -> JSONResponse:
+        """Return the locally written latest report summary, if one exists."""
+        if not LATEST_REPORT.is_file():
+            raise HTTPException(
+                status_code=404,
+                detail="No evaluation report is available yet.",
+            )
+        try:
+            report = json.loads(LATEST_REPORT.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise HTTPException(
+                status_code=503,
+                detail="The latest evaluation report is unavailable.",
+            ) from error
+        summary = {
+            key: report[key]
+            for key in (
+                "git_sha",
+                "prompt_version",
+                "models",
+                "pack",
+                "mode",
+                "timestamp",
+                "n",
+                "k",
+                "metrics",
+                "audit",
+            )
+            if key in report
+        }
+        return JSONResponse(content=summary)
 
     return application
 

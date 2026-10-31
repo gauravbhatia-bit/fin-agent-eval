@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "placeholder": true,
+  "note": "Targets are roadmap placeholders, not measured project results. Replace them only after a reviewed evaluation run.",
+  "tolerance_pct_points": 3.0,
+  "metrics": {
+    "decision_accuracy": 0.85,
+    "refusal_recall": 0.90,
+    "over_refusal_rate": 0.05,
+    "tool_name_accuracy": 0.90,
+    "tool_args_accuracy": 0.85,
+    "numeric_fidelity": 0.90,
+    "content_score": 0.80,
+    "grounding_rate": 0.85,
+    "consistency_decision": 0.85
+  },
+  "lower_is_better": [
+    "over_refusal_rate"
+  ]
+}
