@@ -160,6 +160,49 @@ Terraform files are added in Phase 8. Dependabot checks Python dependencies,
 GitHub Actions, and Docker weekly; Terraform updates can be enabled when its
 configuration is added.
 
+## Free-tier deployment preview (not deployed)
+
+The optional deployment preview uses a Render Blueprint in `render.yaml`
+instead of Terraform. The current Render Terraform provider only documents
+paid compute plans ([provider resource docs](https://registry.terraform.io/providers/render-oss/render/latest/docs/resources/web_service));
+Render Blueprints support the `free` plan ([Blueprint specification](https://render.com/docs/blueprint-spec)).
+This preview does not create cloud resources, publish a container image,
+configure secrets, or add a GitHub Actions deployment workflow. A created
+Blueprint may sync repository changes automatically; leave **Auto Sync**
+disabled until you explicitly want redeployments. Do not click **Deploy
+Blueprint** until you have reviewed the proposed service and decided to publish it.
+
+The free Render API would be public, sleep after 15 minutes without traffic,
+and use an ephemeral filesystem. The documented free compute plan has 0.1 CPU
+and 512 MB RAM. Render currently includes 750 free instance hours per workspace
+each calendar month, so one continuously running service can use nearly all of
+that allowance; included bandwidth/build-pipeline limits also apply. Excess
+usage can incur charges if a payment method is attached. Free instances are
+for hobby/testing use, not production. Review Render's
+[free instance limits](https://render.com/docs/free) before deployment.
+No Gemini key is included: the local fictional fee calculator and deterministic
+policy refusals work, but ordinary model chat is not configured. Do not add a
+Gemini key unless you choose to enable model calls and accept its quota and
+potential billing implications.
+
+If you later approve deployment:
+
+1. Review `render.yaml` and create the Render Blueprint from the repository;
+   verify the service is on the **Free** plan before confirming. The API URL
+   will be shown in the Render dashboard.
+2. Deploy `ui/app.py` from this public GitHub repository to
+   [Streamlit Community Cloud](https://docs.streamlit.io/deploy/streamlit-community-cloud).
+   Select Python 3.12 in the app settings.
+3. In the Streamlit app's **Advanced settings → Secrets**, set
+   `BACKEND_URL = "https://<your-render-service>.onrender.com"`. This is a
+   public endpoint, not a credential. The UI reads it from `st.secrets`.
+4. Verify `/health`, the `/fees` endpoint, and the UI before sharing the URL.
+   Expect a cold start after idle periods. Keep Render Auto Sync disabled
+   until you explicitly want repository changes to redeploy the service.
+
+This is a manual, review-first alternative to the roadmap's Terraform/CD plan;
+no apply, public deployment, or automatic release workflow is configured.
+
 To protect `main`, open **Settings → Branches → Add branch protection rule**,
 set the branch name pattern to `main`, and require pull requests plus these
 status checks: `lint-test`, `eval-smoke`, `docker-build`, and

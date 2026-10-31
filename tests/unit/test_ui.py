@@ -176,6 +176,39 @@ def test_chat_reports_connection_error_separately_from_timeout() -> None:
         client.chat("session", "Calculate a fictional demo fee.")
 
 
+def test_backend_url_prefers_environment_over_streamlit_secret(monkeypatch) -> None:
+    import ui.app as ui_app
+
+    monkeypatch.setenv("BACKEND_URL", " https://api.example.test ")
+    monkeypatch.setattr(ui_app.st, "secrets", {"BACKEND_URL": "https://secret.test"})
+
+    assert ui_app._backend_url() == "https://api.example.test"
+
+
+def test_backend_url_reads_streamlit_cloud_secret(monkeypatch) -> None:
+    import ui.app as ui_app
+
+    monkeypatch.delenv("BACKEND_URL", raising=False)
+    monkeypatch.setattr(ui_app.st, "secrets", {"BACKEND_URL": "https://api.test"})
+
+    assert ui_app._backend_url() == "https://api.test"
+
+
+def test_backend_url_defaults_locally_when_streamlit_secrets_are_missing(
+    monkeypatch,
+) -> None:
+    import ui.app as ui_app
+
+    class MissingSecrets:
+        def __getitem__(self, _key: str) -> str:
+            raise FileNotFoundError("No secrets configured.")
+
+    monkeypatch.delenv("BACKEND_URL", raising=False)
+    monkeypatch.setattr(ui_app.st, "secrets", MissingSecrets())
+
+    assert ui_app._backend_url() == "http://127.0.0.1:8000"
+
+
 def test_fee_calculator_posts_structured_input_without_chat_timeout() -> None:
     session = Mock()
     response = Mock(ok=True)

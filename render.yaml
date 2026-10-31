@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: fin-agent-eval-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LLM_MODE
+        value: live
+      - key: PACK
+        value: eu_us_etf
+      - key: RATE_LIMIT_PER_MIN
+        value: "10"
+      - key: DAILY_CALL_CAP
+        value: "10"
+      - key: MAX_INPUT_CHARS
+        value: "1000"
+      - key: GIT_SHA
+        value: free-tier-preview
