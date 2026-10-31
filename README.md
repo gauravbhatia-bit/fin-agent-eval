@@ -22,6 +22,16 @@ Phases 1-7 are implemented. Phase 3 adds the record/replay/live Gemini client, h
   The sample is illustrative—not measured model quality—and the current
   baseline thresholds are placeholders.
 
+## Live demo screenshots
+
+These screenshots are from the deployed app. Gemini chat is disabled in this
+public demo; the safety example is a deterministic policy refusal. The fee
+calculator uses fictional DemoBroker data, not real broker pricing.
+
+![Fictional DemoBroker fee calculator returning EUR 3.00 for a EUR 2,000 ETF order](docs/screenshots/demo-fee-calculator.png)
+
+![Deterministic refusal to recommend whether to buy DEMO-WORLD-ETF](docs/screenshots/demo-safety-refusal.png)
+
 The project demonstrates safety routing, structured tool calls, replayable
 evaluation, and operational trade-offs. It is a portfolio prototype, not a
 production financial service.
