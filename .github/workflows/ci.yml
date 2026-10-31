@@ -76,7 +76,7 @@ jobs:
       - name: Note missing smoke baseline
         if: steps.cassettes.outputs.available == 'true' && steps.smoke-baseline.outputs.available != 'true'
         run: echo "::warning::No reviewed evals/baseline.smoke.json exists yet, so the replay report is uploaded without a quality-gate comparison."
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: eval-smoke-report
