@@ -399,9 +399,11 @@ def test_evaluation_runner_saves_and_resumes_rule_refusal(
     runner = EvaluationRunner(settings, client, output)
 
     first = runner.run([case], runs=1)
+    rerun = runner.run([case], runs=1)
     second = runner.run([case], runs=1, resume=True)
 
     assert first["traces"][0]["decision"] == "refused"
+    assert rerun["previous_metrics"]["decision_accuracy"]["value"] == 1
     assert second["n"] == 1
     assert len(second["traces"]) == 1
     assert output.is_file()

@@ -11,6 +11,8 @@ from google.genai import types
 from app.config import Settings
 from app.llm.types import EmbeddingResult, LLMResult, ToolCall
 
+GEMINI_HTTP_TIMEOUT_MS = 30_000
+
 
 class GeminiClient:
     """Thin adapter around the Google GenAI SDK; it does not persist requests."""
@@ -29,7 +31,10 @@ class GeminiClient:
                     "GEMINI_API_KEY is required for live or record mode. "
                     "Set it in the local .env file."
                 )
-            self._client = genai.Client(api_key=api_key.get_secret_value())
+            self._client = genai.Client(
+                api_key=api_key.get_secret_value(),
+                http_options=types.HttpOptions(timeout=GEMINI_HTTP_TIMEOUT_MS),
+            )
         return self._client
 
     def generate(

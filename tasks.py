@@ -60,6 +60,8 @@ def test() -> None:
             "-m",
             "pytest",
             "-q",
+            "--basetemp",
+            str(ROOT / ".pytest-basetemp"),
             "--cov=app",
             "--cov=evals",
             "--cov-fail-under=75",
@@ -78,6 +80,19 @@ def run_api() -> None:
             "--reload",
             "--port",
             "8000",
+        ]
+    )
+
+
+def run_ui() -> None:
+    """Run the Streamlit UI against BACKEND_URL (default: local API)."""
+    run(
+        [
+            str(VENV_PYTHON),
+            "-m",
+            "streamlit",
+            "run",
+            "ui/app.py",
         ]
     )
 
@@ -143,6 +158,7 @@ def main() -> None:
             "lint",
             "test",
             "run-api",
+            "run-ui",
             "eval-smoke",
             "eval-full",
             "eval-record",
@@ -155,6 +171,7 @@ def main() -> None:
         "lint": lint,
         "test": test,
         "run-api": run_api,
+        "run-ui": run_ui,
         "eval-smoke": eval_smoke,
         "eval-full": eval_full,
         "eval-record": eval_record,
